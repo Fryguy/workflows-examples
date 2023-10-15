@@ -4,13 +4,7 @@ require "pathname"
 require "json"
 require "rbvmomi"
 
-secrets = JSON.load(File.read(ENV.fetch("_CREDENTIALS")))
-
-api_user     = secrets.fetch("api_user", "admin")
-api_password = secrets.fetch("api_password", "smartvm")
-
-api_url      = ENV.fetch("API_URL", "http://localhost:3000")
-verify_ssl   = ENV.fetch("VERIFY_SSL", "true") == "true"
+# Image-specific parameters
 ems_id       = ENV.fetch("PROVIDER_ID")
 template_ref = ENV.fetch("TEMPLATE")
 folder_ref   = ENV.fetch("FOLDER", nil)
@@ -18,9 +12,17 @@ host_ref     = ENV.fetch("HOST", nil)
 pool_ref     = ENV.fetch("RESPOOL", nil)
 vm_name      = ENV.fetch("NAME")
 
-require "manageiq-api-client"
-api = ManageIQ::API::Client.new(:url => api_url, :user => api_user, :password => api_password, :ssl => {:verify => verify_ssl})
+# ManageIQ API login
+secrets = JSON.load(File.read(ENV.fetch("_CREDENTIALS")))
+secrets.transform_keys! { |k| k.sub(/^api_/, "").to_sym }
 
+url        = ENV.fetch("API_URL", "http://localhost:3000")
+verify_ssl = ENV.fetch("VERIFY_SSL", "true") == "true"
+
+api_options = {url: url, ssl: {verify: verify_ssl}}.merge(secrets)
+api = ManageIQ::API::Client.new(api_options)
+
+# Clone the template
 vcenter_host = api.providers.pluck(:id, :hostname).detect { |id, _| id == ems_id }.last
 
 vim = RbVmomi::VIM.connect(
